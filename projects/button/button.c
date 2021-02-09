@@ -3,33 +3,24 @@
  *
  * author: Furkan Cayci & Lin Zhong
  * description:
- *   blinks LEDs one at a time using timer interrupt
- *   timer2 is used as the source, and it is setup
- *   to run at 10 kHz. LED blinking rate is set to
- *   1 second.
+ *   green, orange and red light up sequentially 
+ *  after reset or user button is pressed.
  *
- * timer and timer interrupt setup steps:
- *   1. Enable TIMx clock from RCC
- *   2. Set prescaler for the timer from PSC
- *   3. Set auto-reload value from ARR
- *   4. (optional) Enable update interrupt from DIER bit 0
- *   5. (optional) Enable TIMx interrupt from NVIC
- *   6. Enable TIMx module from CR1 bit 0
  */
 
 #include "stm32f4xx.h"
 #include "system_stm32f4xx.h"
 
 enum GPIO_pin_state {OUTPUT_HIGH, INPUT_X, INPUT_LOW};
+enum bool {true,false};
 
-/* Global indicator whether a capicitance measurement is ready */
-int measured = 0;
+/* Global indicator whether the user button is pressed */
+enum bool pushed = false;
 
 /*************************************************
 * function declarations
 *************************************************/
 int main(void);
-void start_input(void);
 
 /*************************************************
 * external interrupt handler
@@ -42,17 +33,11 @@ void EXTI0_IRQHandler(void)
 
         /* Stop counter */
 
-        measured = 1; //Indicate measurement is ready
+        pushed = true; //Indicate measurement is ready
         GPIOD->ODR |= (uint16_t)(0x8000); //blue on
-
-        /* wait little bit */
-        for(int j=0; j<1000000; j++);
-
         
         // Clear pending bit
         EXTI->PR = (1 << 0);
-
-
 
     }
 }
@@ -71,10 +56,7 @@ void TIM2_IRQHandler(void)
             TIM2->SR &= ~(1U << 0);
         }
     }
-    
-    /* Start Measurement */
-    
-    
+     
     switch(state) {
 
         case INPUT_LOW:
@@ -90,14 +72,16 @@ void TIM2_IRQHandler(void)
 
             break;
         case OUTPUT_HIGH:
-            start_input(); 
+            pushed = false; // measurement not ready
+            GPIOD->ODR &= (uint16_t)0x7FFF;//blue off
+
 
             GPIOD->ODR |= 0x2000;//orange
             state = INPUT_X;
             break;
         case INPUT_X:
 
-            if(measured==1) {
+            if(pushed==true) {
                 GPIOD->ODR = 0x00000000;
                 state = INPUT_LOW;
             } else{
@@ -107,21 +91,6 @@ void TIM2_IRQHandler(void)
             break;
     } 
     
-
-}
-
-/******************************************
- * Set PC.7 as input and interruptible
- ******************************************/
-
-void start_input(void)
-{
-    
-    measured = 0; // measurement not ready
-    GPIOD->ODR &= (uint16_t)0x7FFF;//blue off
-
-    //Start timer counter
-
 }
 
 
@@ -143,8 +112,7 @@ int main(void)
     /* Set up timer interrupt */
     // enable TIM2 clock (bit0)
     RCC->APB1ENR |= (1 << 0);
-    
-    
+     
     // Timer clock runs at ABP1 * 2
     //   since ABP1 is set to /4 of fCLK
     //   thus 168M/4 * 2 = 84Mhz
@@ -157,7 +125,7 @@ int main(void)
     // Set the auto-reload value to 10000
     //   which should give 1 second timer interrupts
     // 10000 measn 1000 ms timer interrupt
-    TIM2->ARR = 10000;
+    TIM2->ARR = 4000;
 
     // Update Interrupt Enable
     TIM2->DIER |= (1 << 0);
@@ -168,11 +136,6 @@ int main(void)
 
     // Enable Timer 2 module (CEN, bit0)
     TIM2->CR1 |= (1 << 0);
-
-
-
-    
-    measured = 0;
 
 
     // enable SYSCFG clock (APB2ENR: bit 14)
@@ -197,9 +160,6 @@ int main(void)
 
     // enable EXT0 IRQ from NVIC
     NVIC_EnableIRQ(EXTI0_IRQn);
-
-
-
 
 
     while(1)

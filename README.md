@@ -69,6 +69,8 @@ In order to debug your code, connect your board to the PC, run `st-util` (comes 
 
 ## Projects
 
+* [button](projects/button/) -Button press leads to resetting LEDs
+* [touch](projects/touch/) - Touch of a pin leads to resetting LEDs
 * [blinky](projects/blinky/) - Good old blink LEDs example
 * [clock](projects/clock/) - Shows how to change clock frequencies on the fly
 * [math](projects/math/) - A simple sine function to test math library operation
